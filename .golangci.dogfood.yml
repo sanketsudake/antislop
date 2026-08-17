@@ -1,0 +1,23 @@
+# Runs the antislop module plugin against this repository through the custom-gcl
+# binary built by `golangci-lint custom` (see .custom-gcl.yml).
+version: "2"
+linters:
+  default: none
+  enable:
+    - antislop
+  settings:
+    custom:
+      antislop:
+        type: module
+        description: Rejects low-evidence Go patterns
+        original-url: github.com/sanketsudake/antislop
+        settings:
+          disable: []
+          noanyparams: {allow-variadic: true}
+issues:
+  # The plugin smoke test compares the full finding set against
+  # example/expected.txt, so no finding may be capped or deduplicated away:
+  # two analyzers legitimately report the same line (nowidenassert.go:8).
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

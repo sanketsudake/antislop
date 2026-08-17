@@ -1,0 +1,10 @@
+# Builds a golangci-lint binary that includes antislop as a module plugin.
+#   golangci-lint custom
+#   ./custom-gcl run -c .golangci.dogfood.yml ./...
+version: v2.12.2
+plugins:
+  - module: github.com/sanketsudake/antislop
+    # The register.Plugin call lives in the plugin/ subpackage, so the blank
+    # import golangci-lint generates must name it, not the module root.
+    import: github.com/sanketsudake/antislop/plugin
+    path: ./
