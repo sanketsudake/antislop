@@ -1,0 +1,48 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.26.x", "1.27.0-rc.3"]
+    continue-on-error: ${{ matrix.go == '1.27.0-rc.3' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: make test
+      - run: make dogfood
+      - run: make smoke
+      - run: make gendocs-check
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+      - run: make deps-check
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          install-only: true
+      - run: make plugin
+      - run: make plugin-smoke

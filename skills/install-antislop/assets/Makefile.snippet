@@ -1,0 +1,15 @@
+# Standalone antislop: no golangci-lint, no binary to build.
+# Pin the version; @latest makes the lint result depend on the day it ran.
+ANTISLOP_VERSION ?= v0.1.0
+
+.PHONY: lint-antislop
+lint-antislop:
+	go run github.com/sanketsudake/antislop/cmd/antislop@$(ANTISLOP_VERSION) ./...
+
+# Disable an analyzer with -<name>=false, set an option with
+# -<name>.<option>=<value>; `antislop -help` lists them. Example:
+#   go run ...@$(ANTISLOP_VERSION) -noreflect=false -noanyparams.allow-variadic=false ./...
+# Production code only (skip _test.go files):
+#   go run ...@$(ANTISLOP_VERSION) -test=false ./...
+# Counts per analyzer and package instead of one line per finding:
+#   go run ...@$(ANTISLOP_VERSION) -summary ./...

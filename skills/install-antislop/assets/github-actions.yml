@@ -1,0 +1,32 @@
+# Lint job that builds the custom golangci-lint binary with the antislop
+# plugin and runs it. Copy into .github/workflows/, or merge these steps into
+# the repository's existing lint job.
+#
+# A plain `golangci-lint run` does not know about the plugin and silently
+# skips antislop, so CI has to run ./custom-gcl instead.
+name: lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  antislop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          # Building the plugin into golangci-lint needs Go 1.26 or newer,
+          # whatever Go version the repository itself targets.
+          go-version: "1.26.x"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          # Keep in step with the `version` in .custom-gcl.yml.
+          version: v2.12.2
+          install-only: true
+      - name: Build custom-gcl
+        run: golangci-lint custom
+      - name: Run antislop
+        run: ./custom-gcl run ./...

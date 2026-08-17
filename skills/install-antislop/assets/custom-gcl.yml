@@ -1,0 +1,17 @@
+# Builds a golangci-lint binary that includes antislop as a module plugin:
+#
+#   golangci-lint custom      # reads this file, writes ./custom-gcl
+#   ./custom-gcl run ./...
+#
+# `version` must be the golangci-lint version this repository already uses
+# (`golangci-lint --version`), and the plugin `version` a published antislop
+# tag (`go list -m -versions github.com/sanketsudake/antislop`).
+# Building needs a Go 1.26 or newer toolchain.
+version: v2.12.2
+plugins:
+  - module: github.com/sanketsudake/antislop
+    # Required: the register.Plugin call lives in the plugin/ subpackage, so
+    # the blank import golangci-lint generates must name it, not the module
+    # root. Without this line the binary builds and reports nothing.
+    import: github.com/sanketsudake/antislop/plugin
+    version: v0.1.0
