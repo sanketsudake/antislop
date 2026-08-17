@@ -1,15 +1,33 @@
 # Standalone antislop: no golangci-lint, no binary to build.
-# Pin the version; @latest makes the lint result depend on the day it ran.
-ANTISLOP_VERSION ?= v0.1.0
+#
+# Pin it with a tool directive so the version lives in go.mod and a dependency
+# bot can see it:
+#
+#   go get -tool github.com/sanketsudake/antislop/cmd/antislop
+#
+# Use `go tool`, not `go run`. `go run` reports its own exit 1 for any non-zero
+# child status, so "found findings" (3) and "failed to run" (1) become the same
+# answer, and it writes progress lines into the output stream. Exit codes:
+# 0 none, 3 findings, 1 error, 2 bad flag.
 
 .PHONY: lint-antislop
 lint-antislop:
-	go run github.com/sanketsudake/antislop/cmd/antislop@$(ANTISLOP_VERSION) ./...
+	go tool antislop ./...
 
 # Disable an analyzer with -<name>=false, set an option with
 # -<name>.<option>=<value>; `antislop -help` lists them. Example:
-#   go run ...@$(ANTISLOP_VERSION) -noreflect=false -noanyparams.allow-variadic=false ./...
+#   go tool antislop -noreflect=false -noanyparams.allow-variadic=false ./...
 # Production code only (skip _test.go files):
-#   go run ...@$(ANTISLOP_VERSION) -test=false ./...
+#   go tool antislop -test=false ./...
 # Counts per analyzer and package instead of one line per finding:
-#   go run ...@$(ANTISLOP_VERSION) -summary ./...
+#   go tool antislop -summary ./...
+# Skip paths, for every analyzer or just one:
+#   go tool antislop -exclude 'pkg/gen/...' ./...
+#   go tool antislop -nostructuralnames.exclude 'pkg/router/...' ./...
+
+# Adopting on an existing codebase: record what is there today, then gate.
+# The baseline fails on any file/analyzer pair that is missing or grows, and
+# passes one that shrinks. Check it in.
+.PHONY: lint-antislop-baseline
+lint-antislop-baseline:
+	go tool antislop -baseline .antislop-baseline -update ./...

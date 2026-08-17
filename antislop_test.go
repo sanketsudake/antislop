@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/sanketsudake/antislop"
+	"github.com/sanketsudake/antislop/internal/baseline"
 )
 
 func TestValidate(t *testing.T) {
@@ -96,4 +98,91 @@ func TestInfoOptionDefaultsRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("rendered defaults decode to %+v, want %+v", cfg, want)
 	}
+}
+
+// Every analyzer must carry the path-exclusion flag, bound once in the
+// registry rather than by each rule — but it must NOT appear in Infos(),
+// which feeds the golangci-lint settings the plugin path reads. That path
+// scopes a linter with issues.exclude-rules and ignores this option, so
+// listing it there would document something that does nothing.
+func TestExcludeOptionIsBoundButNotAdvertisedToThePlugin(t *testing.T) {
+	for _, a := range antislop.Analyzers() {
+		if a.Flags.Lookup("exclude") == nil {
+			t.Errorf("analyzer %q has no exclude flag", a.Name)
+		}
+	}
+	for _, info := range antislop.Infos() {
+		if slices.ContainsFunc(info.Options, func(o antislop.Option) bool { return o.Name == "exclude" }) {
+			t.Errorf("analyzer %q advertises exclude to the plugin settings", info.Name)
+		}
+	}
+}
+
+// Exclusion has to filter what a driver actually reports, not merely match
+// paths, so this runs the analyzers over the example module and checks that
+// the findings for an excluded file disappear while the rest survive.
+func TestExcludeFiltersReportedDiagnostics(t *testing.T) {
+	const excluded = "noanyparams.go"
+
+	all := summaryCounts(t)
+	if all[excluded] == 0 {
+		t.Fatalf("fixture problem: no findings in %s to exclude", excluded)
+	}
+
+	t.Run("per-analyzer exclude drops only that analyzer", func(t *testing.T) {
+		got := summaryCounts(t, "-noanyparams.exclude", excluded)
+		if got[excluded] >= all[excluded] {
+			t.Errorf("findings in %s did not drop: %d -> %d", excluded, all[excluded], got[excluded])
+		}
+		for file, n := range all {
+			if file != excluded && got[file] != n {
+				t.Errorf("%s changed from %d to %d; exclusion leaked", file, n, got[file])
+			}
+		}
+	})
+
+	t.Run("driver-wide exclude drops the file entirely", func(t *testing.T) {
+		got := summaryCounts(t, "-exclude", excluded)
+		if got[excluded] != 0 {
+			t.Errorf("%d finding(s) still reported in an excluded file", got[excluded])
+		}
+		for file, n := range all {
+			if file != excluded && got[file] != n {
+				t.Errorf("%s changed from %d to %d; exclusion leaked", file, n, got[file])
+			}
+		}
+	})
+}
+
+// summaryCounts runs baseline -update over the example module and returns
+// findings per file, which is the cheapest way to observe what a driver
+// reported after filtering.
+func summaryCounts(t *testing.T, extra ...string) map[string]int {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "baseline.txt")
+	args := append([]string{"-baseline", path, "-update", "-dir=example"}, extra...)
+	var out, errOut strings.Builder
+	if code := baseline.Run(append(args, "./..."), antislop.Analyzers(), &out, &errOut); code != 0 {
+		t.Fatalf("baseline -update exit %d: %s", code, errOut.String())
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, line := range strings.Split(string(body), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			continue
+		}
+		n, err := strconv.Atoi(fields[0])
+		if err != nil {
+			t.Fatalf("bad baseline line %q", line)
+		}
+		counts[fields[1]] += n
+	}
+	return counts
 }

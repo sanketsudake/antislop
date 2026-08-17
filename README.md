@@ -27,10 +27,20 @@ Opinionated `go/analysis` analyzers that reject low-evidence Go patterns.
 ### Standalone
 
 ```bash
-go run github.com/sanketsudake/antislop/cmd/antislop@latest ./...
+go get -tool github.com/sanketsudake/antislop/cmd/antislop
+go tool antislop ./...
 ```
 
+Prefer `go tool` (or an installed binary) over `go run`.
+`go run` reports its own exit 1 for any non-zero child status,
+so "found findings" (3) becomes indistinguishable from "failed to run" (1),
+and it writes progress lines into the output stream —
+both matter to anything that gates on the result.
+
+Exit codes: **0** no findings, **3** findings reported, **1** an error (bad packages, unreadable baseline), **2** a bad flag.
+
 Disable an analyzer with `-<name>=false`; set an option with `-<name>.<option>=<value>` (`antislop -help` lists them).
+Skip paths with `-exclude` (every analyzer) or `-<name>.exclude` (one analyzer); see [Excluding paths](#excluding-paths).
 
 On an existing codebase, start with the summary instead of the finding list:
 
@@ -247,18 +257,66 @@ not the fact that the line exists.
 
 ## Adopting on an existing codebase
 
-antislop ships no baseline on purpose; the host has better tools for rollout.
+There are two ways to adopt without either a mass edit or a disabled rule set.
+Both keep every rule on; they differ in what they gate against.
+
+**A baseline**, when you run the standalone binary:
+
+```bash
+antislop -baseline .antislop-baseline -update ./...   # record what is there today
+antislop -baseline .antislop-baseline ./...           # gate: fails on anything new
+```
+
+The file records a count per file and analyzer.
+A pair that is missing, or that grows, fails; a pair that shrinks passes and can be re-recorded.
+It is a ratchet, not an amnesty — the tree can only get cleaner, and every new finding is still an error.
+
+It carries no line numbers on purpose.
+Keying on them churns the file on every edit above a finding,
+which is how a baseline stops being regenerated and starts being ignored.
+The cost is that a net-zero swap inside one file and analyzer is not caught; diff stability is worth more.
+Check the file in, and treat each line as a claim about that file that a reviewer can challenge.
+
+**`new-from-rev`**, when you run under golangci-lint:
+`issues.new-from-rev: <sha>` (or `new: true`) reports only findings introduced after a revision,
+so the whole rule set can be on from day one.
+
+Either way:
 
 1. Measure first: `antislop -summary ./...` (add `-test=false` to see production code alone).
    The per-package table tells you where the untyped surface is.
-2. Gate new code, fix old code as you touch it:
-   golangci-lint's `issues.new-from-rev: <sha>` (or `new: true`) reports only findings introduced after a revision,
-   so the whole rule set can be on from day one without a mass edit.
-3. Turn the volume rules down, not off, where the domain is genuinely untyped
+2. Turn the volume rules down, not off, where the domain is genuinely untyped
    (a JSON-document engine, a protocol bridge):
    `noanycontainers.encoders`, `nonarrowany.sources`, `skip-declared-any`, and `-test=false` are the knobs;
    `disable` is the last resort and deserves a comment in the config.
+3. Prefer a path exclusion over disabling a rule module-wide when only one package is affected —
+   see [Excluding paths](#excluding-paths).
 4. Never make lint pass by laundering types (`any(x)`, `//nolint` without a reason, a `SAFETY:` that states no invariant).
+
+## Excluding paths
+
+Under golangci-lint, scope a linter with `issues.exclude-rules` as usual.
+The standalone binary is its own host, so it carries the same capability:
+
+```bash
+antislop -exclude 'pkg/gen/...' ./...                      # every analyzer skips that subtree
+antislop -nostructuralnames.exclude 'pkg/router/...' ./...  # one analyzer skips it
+```
+
+Patterns match the path relative to the directory the run started in, with forward slashes:
+
+| Pattern | Matches |
+|---|---|
+| `pkg/gen/...` | that directory and everything below it |
+| `pkg/a/a.go` | exactly that file |
+| `*_test.go` | that base name at any depth (a pattern with no `/` matches the base name) |
+| `pkg/*.go` | one segment only — `*` does not cross a slash |
+
+Reach for the per-analyzer form first.
+A rule that is wrong for one package is usually right for the rest,
+and `-<name>.exclude` keeps it guarding them;
+disabling the rule module-wide gives that up to fix one place.
+Exclusion is a driver concern — the rules themselves never learn which project is running them.
 
 ## Test files
 
