@@ -1,0 +1,21 @@
+noanycontainers.go:6:15: noanycontainers: map[string]any erases the value types; decode the document at its I/O boundary into a struct (or a map of a named type)
+noanyfields.go:5:10: noanyfields: field "Payload" has type any, which carries no evidence about the value; give the field the type it actually holds, or split the struct per variant
+noanyparams.go:6:11: noanyparams: parameter "value" has type any, which carries no evidence about the value; decode input at its I/O boundary into a named type and accept that type
+noanyreturns.go:4:13: noanyreturns: result has type any, which gives the caller no evidence about the value; return a named type (or a small interface with the methods the caller needs)
+noanytypes.go:4:6: noanytypes: type "Metadata" is the empty interface under another name and carries no evidence; declare the fields or methods the values actually have, or delete the alias
+nochainedassert.go:18:18: noanycontainers: map[string]any erases the value types; decode the document at its I/O boundary into a struct (or a map of a named type)
+nochainedassert.go:18:47: noanycontainers: map[string]any erases the value types; decode the document at its I/O boundary into a struct (or a map of a named type)
+nochainedassert.go:18:9: nochainedassert: assertion chained through an any-valued index walks an untyped document; decode it once at its I/O boundary into a struct
+nochainedassert.go:6:9: nochainedassert: assertion chained through any fabricates evidence; assert directly from the value's declared type, or decode it once at its I/O boundary
+noknownwidening.go:4:19: noknownwidening: value of type int is stored as any, discarding what is known about it; keep the concrete type (or a small interface with the methods that are used)
+nomonkeypatch_test.go:10:2: nomonkeypatch: test reassigns package-level function variable "clock"; pass the dependency in through the constructor or a parameter instead of patching the package
+nonarrowany.go:11:9: nonarrowany: type switch on any narrows a representation without establishing its contract; decode the value at its I/O boundary into a named type and branch on that
+nonarrowany.go:7:42: nonarrowany: comma-ok assertion on any narrows a representation without establishing its contract; decode the value at its I/O boundary into a named type and branch on that
+noreflect.go:6:52: noreflect: reflect.Value.FieldByName reads a field by string with no compile-time evidence; use a typed accessor or decode into a struct at the boundary
+nostructuralnames.go:4:6: nostructuralnames: name "OrderShape" describes structure ("shape") rather than the domain role; rename it for what it represents
+nountypedunmarshal.go:8:15: noanycontainers: map[string]any erases the value types; decode the document at its I/O boundary into a struct (or a map of a named type)
+nountypedunmarshal.go:9:27: nountypedunmarshal: json.Unmarshal into map[string]any keeps the document untyped; decode into a struct that names the fields you use
+nowidenassert.go:7:18: noknownwidening: value of type int is stored as any, discarding what is known about it; keep the concrete type (or a small interface with the methods that are used)
+nowidenassert.go:8:14: nonarrowany: comma-ok assertion on any narrows a representation without establishing its contract; decode the value at its I/O boundary into a named type and branch on that
+nowidenassert.go:8:14: nowidenassert: "boxed" was widened to any at line 7 and is asserted back here; keep the concrete type instead of widening then asserting
+safetycomment.go:7:9: safetycomment: unchecked type assertion has no SAFETY: justification; state the checked invariant in a preceding "// SAFETY:" comment, or use the comma-ok form
