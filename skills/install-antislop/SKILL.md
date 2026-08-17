@@ -10,7 +10,8 @@ antislop rejects code that destroys or fabricates type evidence:
 `any` in signatures, fields and containers,
 narrowing back out of `any`,
 `reflect`, monkey patching, structural names, and untyped decoding.
-Every rule is on and every finding is an error; there is no autofix and no baseline.
+Every rule is on and every finding is an error; there is no autofix.
+An existing codebase adopts through a baseline ratchet or `new-from-rev`, not by disabling rules.
 
 Leave work that is not yours untouched, and follow the configuration style the repository already uses.
 
@@ -56,10 +57,18 @@ Leave work that is not yours untouched, and follow the configuration style the r
      A plain `golangci-lint run` does not know about antislop and silently skips it.
 
    **Path B — no golangci-lint.**
-   - Add the standalone target from `assets/Makefile.snippet`
-     to the Makefile or CI lint step:
-     `go run github.com/sanketsudake/antislop/cmd/antislop@<version> ./...`.
-   - Pin the version; `@latest` makes the lint result depend on the day it ran.
+   - Pin the analyzer with a tool directive and invoke it with `go tool`:
+     `go get -tool github.com/sanketsudake/antislop/cmd/antislop`, then
+     `go tool antislop ./...` from the Makefile or CI lint step
+     (`assets/Makefile.snippet`).
+     A tool directive pins the version in `go.mod`, so the lint result does not
+     depend on the day it ran and a dependency bot can see it.
+   - **Do not use `go run`.** It reports its own exit 1 for any non-zero child
+     status, so "found findings" (3) and "failed to run" (1) become the same
+     answer, and it writes progress lines into the output stream. Anything that
+     gates on the exit code or parses the output breaks silently. An installed
+     binary on `$PATH` is equally fine.
+   - Exit codes: 0 no findings, 3 findings, 1 an error, 2 a bad flag.
    - Disable an analyzer with `-<name>=false` and set an option with `-<name>.<option>=<value>`;
      `antislop -help` lists them.
 
@@ -70,11 +79,19 @@ Leave work that is not yours untouched, and follow the configuration style the r
    Ask before adding it; it is a policy choice, and record it with a comment in the config.
 
 4. Run the linter and read what it says. On a repository with existing code,
-   run `go run github.com/sanketsudake/antislop/cmd/antislop@<version> -summary ./...` first
+   run `antislop -summary ./...` first
    and show the user the counts per analyzer and package before enabling anything.
-   For rollout, prefer golangci-lint's `issues.new-from-rev` (new code only) over disabling analyzers,
-   and the volume knobs (`noanycontainers.encoders`, `nonarrowany.sources`, `skip-declared-any`,
-   `-test=false`) over `disable`; record every deviation with a comment in the config.
+   For rollout, prefer a ratchet over disabling analyzers:
+   golangci-lint's `issues.new-from-rev` (new code only), or, on the standalone path,
+   a baseline — `antislop -baseline <file> -update ./...` to record what is there today and
+   `antislop -baseline <file> ./...` to gate, which fails on any file/analyzer pair that is
+   missing or grows and passes one that shrinks. Check the file in; each line is a claim a
+   reviewer can challenge.
+   Where only one package legitimately uses a pattern, scope the rule instead of dropping it:
+   `-<name>.exclude 'pkg/router/...'` (or golangci-lint's `issues.exclude-rules`) keeps the rule
+   guarding every other package.
+   Use the volume knobs (`noanycontainers.encoders`, `nonarrowany.sources`, `skip-declared-any`,
+   `-test=false`) before `disable`; record every deviation with a comment in the config.
    Report what the analyzers find in the repository's own source.
    Change that source only if the user asked for a migration or a cleanup.
 

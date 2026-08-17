@@ -16,6 +16,8 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/sanketsudake/antislop/internal/findings"
 )
 
 // Wanted reports whether args request summary mode.
@@ -99,7 +101,6 @@ type table struct {
 	inTests  int
 	analyzer map[string]*perAnalyzer
 	pkg      map[string]int
-	seen     map[string]bool // dedup across the test and non-test variants of a package
 }
 
 func fail(stderr io.Writer, err error) int {
@@ -110,36 +111,21 @@ func fail(stderr io.Writer, err error) int {
 }
 
 func aggregate(graph *checker.Graph) *table {
-	t := &table{analyzer: map[string]*perAnalyzer{}, pkg: map[string]int{}, seen: map[string]bool{}}
-	for act := range graph.All() {
-		if !act.IsRoot {
-			continue
+	t := &table{analyzer: map[string]*perAnalyzer{}, pkg: map[string]int{}}
+	for _, f := range findings.Collect(graph) {
+		pa := t.analyzer[f.Analyzer]
+		if pa == nil {
+			pa = &perAnalyzer{name: f.Analyzer, files: map[string]bool{}, packages: map[string]bool{}}
+			t.analyzer[f.Analyzer] = pa
 		}
-		fset := act.Package.Fset
-		for _, d := range act.Diagnostics {
-			pos := fset.Position(d.Pos)
-			key := act.Analyzer.Name + "\x00" + pos.String() + "\x00" + d.Message
-			if t.seen[key] {
-				continue
-			}
-			t.seen[key] = true
-			pa := t.analyzer[act.Analyzer.Name]
-			if pa == nil {
-				pa = &perAnalyzer{name: act.Analyzer.Name, files: map[string]bool{}, packages: map[string]bool{}}
-				t.analyzer[act.Analyzer.Name] = pa
-			}
-			pa.total++
-			pa.files[pos.Filename] = true
-			pkgPath := act.Package.PkgPath
-			pkgPath = strings.TrimSuffix(pkgPath, "_test")
-			pkgPath = strings.TrimSuffix(pkgPath, ".test")
-			pa.packages[pkgPath] = true
-			t.pkg[pkgPath]++
-			t.total++
-			if strings.HasSuffix(pos.Filename, "_test.go") {
-				pa.inTests++
-				t.inTests++
-			}
+		pa.total++
+		pa.files[f.File] = true
+		pa.packages[f.Package] = true
+		t.pkg[f.Package]++
+		t.total++
+		if f.InTest {
+			pa.inTests++
+			t.inTests++
 		}
 	}
 	return t

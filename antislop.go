@@ -6,6 +6,7 @@ package antislop
 
 import (
 	"flag"
+	"os"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/sanketsudake/antislop/analyzers/nountypedunmarshal"
 	"github.com/sanketsudake/antislop/analyzers/nowidenassert"
 	"github.com/sanketsudake/antislop/analyzers/safetycomment"
+	"github.com/sanketsudake/antislop/internal/exclude"
 	"github.com/sanketsudake/antislop/internal/flagx"
 )
 
@@ -123,6 +125,37 @@ var registry = []entry{
 	},
 }
 
+// runDir is the directory exclusion patterns are resolved against: the
+// directory the driver runs in, which for `antislop ./...` is the module
+// root. It is read lazily so a driver mode that supports -dir can set it
+// after flag parsing.
+var runDir = func() string {
+	if dir := excludeDir; dir != "" {
+		return dir
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return wd
+}
+
+// excludeDir overrides the directory exclusion patterns resolve against.
+// SetRunDir writes it; driver modes with a -dir flag call that.
+var excludeDir string
+
+// SetRunDir points path exclusion at dir instead of the working directory.
+func SetRunDir(dir string) { excludeDir = dir }
+
+// Every analyzer gets the same path-exclusion option, bound once here rather
+// than in each rule: which paths a project exempts is a driver concern, and
+// the rules stay free of any notion of the project running them.
+func init() {
+	for _, e := range registry {
+		exclude.Wrap(e.def, runDir)
+	}
+}
+
 var byName = func() map[string]entry {
 	m := make(map[string]entry, len(registry))
 	for _, e := range registry {
@@ -203,9 +236,18 @@ func Infos() []Info {
 
 // options lists an analyzer's options in flag-set order, which is
 // alphabetical and therefore stable across builds.
+//
+// The path-exclusion option is left out: it is bound to every analyzer's flag
+// set so the standalone driver modes pick it up, but it is not part of the
+// rule's own configuration, and the golangci-lint plugin does not read it —
+// that host scopes a linter with issues.exclude-rules. Listing it in the
+// generated settings would promise something the plugin path ignores.
 func options(a *analysis.Analyzer) []Option {
 	var out []Option
 	a.Flags.VisitAll(func(f *flag.Flag) {
+		if f.Name == exclude.OptionName {
+			return
+		}
 		out = append(out, Option{
 			Name:    f.Name,
 			Default: defaultLiteral(f),
