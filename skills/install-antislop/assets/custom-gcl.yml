@@ -14,4 +14,4 @@ plugins:
     # the blank import golangci-lint generates must name it, not the module
     # root. Without this line the binary builds and reports nothing.
     import: github.com/sanketsudake/antislop/plugin
-    version: v0.1.0
+    version: v0.2.0
