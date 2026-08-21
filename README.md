@@ -61,7 +61,7 @@ version: v2.13.0
 plugins:
   - module: github.com/sanketsudake/antislop
     import: github.com/sanketsudake/antislop/plugin
-    version: v0.2.0
+    version: v0.3.0
 ```
 
 `import` is required:

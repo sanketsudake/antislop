@@ -31,7 +31,7 @@ Leave work that is not yours untouched, and follow the configuration style the r
 2. Resolve the current versions rather than trusting remembered ones:
    - `go list -m -versions github.com/sanketsudake/antislop` for the published tags; take the last one.
    - `golangci-lint --version` for the version the repository already uses.
-   - antislop pins `golang.org/x/tools` to the version golangci-lint v2.12.x pins,
+   - antislop pins `golang.org/x/tools` to the version golangci-lint v2.13.x pins,
      because `golangci-lint custom` builds both into one binary.
      If the repository is on a different golangci-lint minor version, say so,
      and prefer the standalone path (Path B) over a version mismatch that fails to build.
