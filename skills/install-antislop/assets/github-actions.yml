@@ -19,12 +19,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           # Building the plugin into golangci-lint needs Go 1.26 or newer,
-          # whatever Go version the repository itself targets.
-          go-version: "1.26.x"
+          # and the built binary type-checks with this toolchain's go/types:
+          # keep it at least as new as the Go version the repository targets,
+          # or the analyzed packages fail to load.
+          go-version: "1.27.x"
       - uses: golangci/golangci-lint-action@v8
         with:
           # Keep in step with the `version` in .custom-gcl.yml.
-          version: v2.12.2
+          version: v2.13.0
           install-only: true
       - name: Build custom-gcl
         run: golangci-lint custom
