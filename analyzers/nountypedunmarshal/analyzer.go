@@ -36,7 +36,7 @@ under analysis is resolved to its underlying type, so "type Doc
 map[string]any" is reported at the call.
 
 Not reported: a struct target, a target whose type defers decoding on purpose
-(json.RawMessage, map[string]json.RawMessage), a named type from another
+(json.RawMessage, jsontext.Value, and maps of either), a named type from another
 package (text/template.FuncMap is that package's contract), a pass-through
 argument typed any rather than *any (it holds whatever pointer the caller
 passed; the parameter itself is noanyparams' report), encoding calls such as
@@ -46,7 +46,12 @@ Each entry of functions names one function and the index of its decode-target
 argument: "pkg/path.Func#N" for a package-level function and
 "(*pkg/path.Type).Method#N" (or "(pkg/path.Type).Method#N") for a method.
 Setting functions replaces the default list rather than adding to it; a
-malformed entry is reported as an analysis error rather than ignored.`
+malformed entry is reported as an analysis error rather than ignored.
+
+encoding/json/v2 is generally available from Go 1.27 and is on the default
+list alongside encoding/json: its stricter defaults reject invalid UTF-8 and
+duplicate keys, but a target typed any erases the document either way, so the
+rule reads both the same.`
 
 // Config holds the analyzer options.
 type Config struct {

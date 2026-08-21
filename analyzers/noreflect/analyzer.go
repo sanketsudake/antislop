@@ -37,6 +37,12 @@ return typed values (reflect.DeepEqual, reflect.TypeOf(x).Kind()) unless
 strict is set, and methods of the same name declared on types outside package
 reflect.
 
+Hashing and equality are the reflect uses with the newest typed replacement:
+from Go 1.27, hash/maphash.Hasher[T] states a hash-and-equality contract as an
+interface, and maphash.ComparableHasher[T] implements it for any comparable T
+without reflect. Instantiating it as ComparableHasher[any] puts the erasure
+straight back, so name the element type.
+
 Setting methods replaces the default list rather than adding to it.`
 
 // Config holds the analyzer options.

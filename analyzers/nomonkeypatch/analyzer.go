@@ -43,6 +43,14 @@ fields (srv.now = ...), which are the seam this rule asks for; short variable
 declarations, which introduce a new name rather than replacing a call; and
 package-level variables that are not function typed.
 
+The standard library keeps growing the seams this rule asks for, so the
+patch is rarely the only option left. An http.Client or http.RoundTripper
+passed in through the constructor can be pointed at httptest.NewServer, or,
+from Go 1.27, at httptest.NewTestServer(t, handler), which serves over an
+in-memory network and so needs no port and no patched transport. A clock
+passed in as a field lets testing/synctest drive time with synctest.Sleep
+rather than a patched time.Now.
+
 Setting packages replaces the default list rather than adding to it.`
 
 // Config holds the analyzer options.

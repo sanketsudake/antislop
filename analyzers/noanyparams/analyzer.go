@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 
+	"github.com/sanketsudake/antislop/internal/langver"
 	"github.com/sanketsudake/antislop/internal/passutil"
 	"github.com/sanketsudake/antislop/internal/seams"
 	"github.com/sanketsudake/antislop/internal/typesx"
@@ -35,7 +36,15 @@ elsewhere when allow-dictated is set (heap.Interface.Push, sql.Scanner.Scan,
 sync.Pool.New). The dictating interface must be declared in the same package
 or in a direct import (or be on the built-in well-known list such as
 Scan(any) error); nested func types inside a dictated signature are reported
-once, at the contract.`
+once, at the contract.
+
+On a concrete method in a file compiled at Go 1.27 or newer, the advice also
+names a method type parameter, which keeps the caller's type through the call
+instead of erasing it. An interface method keeps the plain advice, since
+interface methods may not declare type parameters. A generic method may not
+implement an interface either, so the alternative holds only for a method no
+interface dictates -- and that is the author's call, not this rule's: a
+consumer package may declare an interface this rule cannot see.`
 
 // Config holds the analyzer options.
 type Config struct {
@@ -89,8 +98,9 @@ func run(pass *analysis.Pass, cfg Config) {
 		if ft.Params == nil {
 			return true
 		}
+		generic := langver.GenericMethodAdvice(pass, stack)
 		for _, field := range ft.Params.List {
-			check(pass, cfg, field)
+			check(pass, cfg, field, generic)
 		}
 		return true
 	})
@@ -110,7 +120,10 @@ func isDictated(pass *analysis.Pass, set *seams.Set, stack []ast.Node) bool {
 	return false
 }
 
-func check(pass *analysis.Pass, cfg Config, field *ast.Field) {
+// check reports field when its type is the empty interface. genericMethod
+// says the enclosing declaration is a concrete method that could take a type
+// parameter instead, which adds that alternative to the advice.
+func check(pass *analysis.Pass, cfg Config, field *ast.Field, genericMethod bool) {
 	typeExpr := field.Type
 	if el, ok := typeExpr.(*ast.Ellipsis); ok {
 		if cfg.AllowVariadic {
@@ -123,5 +136,9 @@ func check(pass *analysis.Pass, cfg Config, field *ast.Field) {
 		return
 	}
 	subject := typesx.FieldSubject("parameter", typesx.ParamNames(field), types.ExprString(typeExpr))
-	pass.Reportf(field.Pos(), "%s: %s, which carries no evidence about the value; decode input at its I/O boundary into a named type and accept that type", Name, subject)
+	advice := "decode input at its I/O boundary into a named type and accept that type"
+	if genericMethod {
+		advice += ", or give the method its own type parameter (Go 1.27) so the caller's type survives the call"
+	}
+	pass.Reportf(field.Pos(), "%s: %s, which carries no evidence about the value; %s", Name, subject, advice)
 }

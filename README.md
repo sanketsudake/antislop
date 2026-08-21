@@ -57,7 +57,7 @@ the same `-<name>=false` and `-<name>.<option>` flags apply.
 `.custom-gcl.yml`:
 
 ```yaml
-version: v2.12.2
+version: v2.13.0
 plugins:
   - module: github.com/sanketsudake/antislop
     import: github.com/sanketsudake/antislop/plugin
@@ -94,6 +94,20 @@ golangci-lint custom
 ```
 
 Requires Go 1.26 or newer to build the custom binary.
+Build it with Go 1.27 to analyse code that uses Go 1.27 language features.
+
+### Toolchain version
+
+Build antislop with a Go toolchain at least as new as the code it analyses.
+The analyzers type-check your packages with the `go/types` of the toolchain that built the binary,
+so a 1.26-built binary cannot parse a generic method or a promoted-field struct literal.
+It does not silently pass them:
+the package fails to load, every analyzer reports `analysis skipped due to errors in package`,
+and the driver exits **1**, not 0 —
+so a build that gates on the exit code fails rather than reporting a clean run.
+
+antislop's own module stays on `go 1.26.0`, so 1.26 remains supported;
+only the toolchain you build with has to keep up with the code you point it at.
 
 ### Agent skill
 
@@ -349,6 +363,14 @@ make check   # lint, test, dogfood, smoke, deps-check, gendocs-check
 `analyzers/` is canonical: one package per rule with `analysistest` fixtures.
 `example/` holds one file per rule with the README violation and its accepted counterpart;
 `example/expected.txt` is the golden diagnostic list (`make smoke-update` after intentional changes).
+
+Fixtures that need a language feature newer than the module's `go` directive
+live in a `go127`-style testdata package behind a `//go:build` tag,
+with the same tag on the test that drives them,
+so the older CI leg keeps compiling.
+
+[`docs/go1.27.md`](docs/go1.27.md) records what Go 1.27 changed for these rules,
+and which candidate rules were considered and rejected.
 
 ## Credits
 
