@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 
+	"github.com/sanketsudake/antislop/internal/langver"
 	"github.com/sanketsudake/antislop/internal/passutil"
 	"github.com/sanketsudake/antislop/internal/seams"
 	"github.com/sanketsudake/antislop/internal/typesx"
@@ -35,7 +36,12 @@ allow-dictated is set (heap.Interface.Pop, flag.Getter.Get,
 yaml.Marshaler.MarshalYAML, sync.Pool.New). The dictating interface must be
 declared in the same package or in a direct import (or be on the built-in
 well-known list); nested func types inside a dictated signature are reported
-once, at the contract.`
+once, at the contract.
+
+On a concrete method in a file compiled at Go 1.27 or newer, the advice also
+names a method type parameter, which returns the caller's own type instead of
+erasing it. An interface method keeps the plain advice: interface methods may
+not declare type parameters, and a generic method may not implement one.`
 
 // Config holds the analyzer options.
 type Config struct {
@@ -86,8 +92,9 @@ func run(pass *analysis.Pass, cfg Config) {
 		if ft.Results == nil {
 			return true
 		}
+		generic := langver.GenericMethodAdvice(pass, stack)
 		for _, field := range ft.Results.List {
-			check(pass, field)
+			check(pass, field, generic)
 		}
 		return true
 	})
@@ -111,11 +118,18 @@ func isDictated(pass *analysis.Pass, set *seams.Set, stack []ast.Node) bool {
 	return false
 }
 
-func check(pass *analysis.Pass, field *ast.Field) {
+// check reports field when its type is the empty interface. genericMethod
+// says the enclosing declaration is a concrete method that could take a type
+// parameter instead, which adds that alternative to the advice.
+func check(pass *analysis.Pass, field *ast.Field, genericMethod bool) {
 	t := pass.TypesInfo.TypeOf(field.Type)
 	if t == nil || !typesx.IsEmptyInterfaceOwnedBy(t, pass.Pkg) {
 		return
 	}
 	subject := typesx.FieldSubject("result", typesx.ParamNames(field), types.ExprString(field.Type))
-	pass.Reportf(field.Pos(), "%s: %s, which gives the caller no evidence about the value; return a named type (or a small interface with the methods the caller needs)", Name, subject)
+	advice := "return a named type (or a small interface with the methods the caller needs)"
+	if genericMethod {
+		advice += ", or give the method its own type parameter (Go 1.27) and return that"
+	}
+	pass.Reportf(field.Pos(), "%s: %s, which gives the caller no evidence about the value; %s", Name, subject, advice)
 }

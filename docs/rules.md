@@ -41,6 +41,12 @@ or in a direct import (or be on the built-in well-known list such as
 Scan(any) error); nested func types inside a dictated signature are reported
 once, at the contract.
 
+On a concrete method in a file compiled at Go 1.27 or newer, the advice also
+names a method type parameter, which keeps the caller's type through the call
+instead of erasing it. An interface method keeps the plain advice: interface
+methods may not declare type parameters, and a generic method may not
+implement one.
+
 ## noanyreturns
 
 reports function results typed as the empty interface (any / interface{})
@@ -62,6 +68,11 @@ yaml.Marshaler.MarshalYAML, sync.Pool.New). The dictating interface must be
 declared in the same package or in a direct import (or be on the built-in
 well-known list); nested func types inside a dictated signature are reported
 once, at the contract.
+
+On a concrete method in a file compiled at Go 1.27 or newer, the advice also
+names a method type parameter, which returns the caller's own type instead of
+erasing it. An interface method keeps the plain advice: interface methods may
+not declare type parameters, and a generic method may not implement one.
 
 ## noanytypes
 
@@ -323,6 +334,12 @@ return typed values (reflect.DeepEqual, reflect.TypeOf(x).Kind()) unless
 strict is set, and methods of the same name declared on types outside package
 reflect.
 
+Hashing and equality are the reflect uses with the newest typed replacement:
+from Go 1.27, hash/maphash.Hasher[T] states a hash-and-equality contract as an
+interface, and maphash.ComparableHasher[T] implements it for any comparable T
+without reflect. Instantiating it as ComparableHasher[any] puts the erasure
+straight back, so name the element type.
+
 Setting methods replaces the default list rather than adding to it.
 
 ## nomonkeypatch
@@ -350,6 +367,14 @@ fields (srv.now = ...), which are the seam this rule asks for; short variable
 declarations, which introduce a new name rather than replacing a call; and
 package-level variables that are not function typed.
 
+The standard library keeps growing the seams this rule asks for, so the
+patch is rarely the only option left. An http.Client or http.RoundTripper
+passed in through the constructor can be pointed at httptest.NewServer, or,
+from Go 1.27, at httptest.NewTestServer(t, handler), which serves over an
+in-memory network and so needs no port and no patched transport. A clock
+passed in as a field lets testing/synctest drive time with synctest.Sleep
+rather than a patched time.Now.
+
 Setting packages replaces the default list rather than adding to it.
 
 ## nountypedunmarshal
@@ -371,7 +396,7 @@ under analysis is resolved to its underlying type, so "type Doc
 map[string]any" is reported at the call.
 
 Not reported: a struct target, a target whose type defers decoding on purpose
-(json.RawMessage, map[string]json.RawMessage), a named type from another
+(json.RawMessage, jsontext.Value, and maps of either), a named type from another
 package (text/template.FuncMap is that package's contract), a pass-through
 argument typed any rather than *any (it holds whatever pointer the caller
 passed; the parameter itself is noanyparams' report), encoding calls such as
@@ -382,6 +407,11 @@ argument: "pkg/path.Func#N" for a package-level function and
 "(*pkg/path.Type).Method#N" (or "(pkg/path.Type).Method#N") for a method.
 Setting functions replaces the default list rather than adding to it; a
 malformed entry is reported as an analysis error rather than ignored.
+
+encoding/json/v2 is generally available from Go 1.27 and is on the default
+list alongside encoding/json: its stricter defaults reject invalid UTF-8 and
+duplicate keys, but a target typed any erases the document either way, so the
+rule reads both the same.
 
 ## nostructuralnames
 
