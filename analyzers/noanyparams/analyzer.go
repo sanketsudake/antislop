@@ -40,9 +40,11 @@ once, at the contract.
 
 On a concrete method in a file compiled at Go 1.27 or newer, the advice also
 names a method type parameter, which keeps the caller's type through the call
-instead of erasing it. An interface method keeps the plain advice: interface
-methods may not declare type parameters, and a generic method may not
-implement one.`
+instead of erasing it. An interface method keeps the plain advice, since
+interface methods may not declare type parameters. A generic method may not
+implement an interface either, so the alternative holds only for a method no
+interface dictates -- and that is the author's call, not this rule's: a
+consumer package may declare an interface this rule cannot see.`
 
 // Config holds the analyzer options.
 type Config struct {
