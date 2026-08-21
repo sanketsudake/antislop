@@ -29,9 +29,16 @@ func AtLeast(pass *analysis.Pass, stack []ast.Node, want string) bool {
 	if !isFile {
 		return false
 	}
-	v := pass.TypesInfo.FileVersions[file]
+	return atLeast(pass.TypesInfo.FileVersions[file], pass.Pkg.GoVersion(), want)
+}
+
+// atLeast holds the version decision on its own, away from the pass an
+// analysistest fixture cannot vary: a GOPATH-style fixture has no go.mod, so
+// pkg is always empty there and only the //go:build line moves file.
+func atLeast(file, pkg, want string) bool {
+	v := file
 	if v == "" {
-		v = pass.Pkg.GoVersion()
+		v = pkg
 	}
 	return version.IsValid(v) && version.Compare(v, want) >= 0
 }
